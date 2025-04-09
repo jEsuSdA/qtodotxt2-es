@@ -21,7 +21,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 ## CAMBIOS RESPECTO AL ORIGINAL
 
 - **Versión en español** (intenté hacerlo con el módulo de traducción QML pero no hubo forma, así que la aplicación está traducida directamente en el código. Si te interesa la versión en tu idioma... ya sabes...)
-- **Cambio completo de iconos** usando los iconos del proyecto Papirus (en su versión e-Papirus)
+- **Cambio completo de iconos** usando los iconos del proyecto [Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme) (en su versión e-Papirus)
 - Ahora los **iconos son en formato Vectorial SVG**, con lo que se ven mejor.
 - **Solucionado problema con inserción de fechas** al añadir a una tarea fecha de vencimiento con due: (ahora las fechas se añaden sin error)
 - **Detección y autorecarga de tareas cuando el archivo todo.txt es modificado** desde otra aplicación. Antes, cuando se modificaba el archivo todo.txt desde fuera de QtodoTXT2, se mostraba una ventana de confirmación, lo cual era bastante molesto si, como yo, usas todo.txt por línea de comandos al mismo tiempo que con QtodoTXT2.
