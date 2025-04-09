@@ -18,7 +18,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 
 
 
-##CAMBIOS RESPECTO AL ORIGINAL
+## CAMBIOS RESPECTO AL ORIGINAL
 
 - **Versión en español** (intenté hacerlo con el módulo de traducción QML pero no hubo forma, así que la aplicación está traducida directamente en el código. Si te interesa la versión en tu idioma... ya sabes...)
 - **Cambio completo de iconos** usando los iconos del proyecto Papirus (en su versión e-Papirus)
@@ -39,7 +39,7 @@ A su vez, QtodoTXT2 es un fork de QtodoTXT, que es el original.
 *   Eliminación del soporte para algunas opciones y tecnologías heredadas como la bandeja del sistema (systray).
 
 
-##INSTALACIÓN
+## INSTALACIÓN
 
 Basta con 
 
