@@ -192,13 +192,17 @@ class FiltersController(QtCore.QObject):
 
     def _addAllContexts(self, mfile):
         contexts = mfile.getAllContexts()
-        for context, number in contexts.items():
+        #for context, number in contexts.items():
+        # Ordenamos los contextos alfabéticamente antes de añadirlos al modelo
+        for context, number in sorted(contexts.items()):
             mfilter = ContextFilter(context)
             self.model.addFilter(mfilter, number)
 
     def _addAllProjects(self, mfile):
         projects = mfile.getAllProjects()
-        for project, counts in projects.items():
+        #for project, counts in projects.items():
+        # Ordenamos los proyectos alfabéticamente antes de añadirlos al modelo
+        for project, counts in sorted(projects.items()):
             mfilter = ProjectFilter(project)
             self.model.addFilter(mfilter, counts)
 

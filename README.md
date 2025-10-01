@@ -26,6 +26,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 - **Solucionado problema con inserción de fechas** al añadir a una tarea fecha de vencimiento con due: (ahora las fechas se añaden sin error)
 - **Detección y autorecarga de tareas cuando el archivo todo.txt es modificado** desde otra aplicación. Antes, cuando se modificaba el archivo todo.txt desde fuera de QtodoTXT2, se mostraba una ventana de confirmación, lo cual era bastante molesto si, como yo, usas todo.txt por línea de comandos al mismo tiempo que con QtodoTXT2.
 - **Muestra en el panel de filtros de las tareas por fecha de vencimiento**. En la versión original sólo se mostraban los filtros de vencimiento si había alguna tarea que venciera en alguno de los plazos prefijados.
+- **Contextos y Proyectos ordenados alfabéticamente en el panel lateral de filtros**. Antes aparecían desordenados.
 - Algunas mejoras y correcciones menores adicionales.
 
 
