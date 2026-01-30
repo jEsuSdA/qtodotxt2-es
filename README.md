@@ -42,11 +42,11 @@ En concreto, y para entender mejor la forma de usarlo, has de tener en cuenta qu
 
 Así, las prioridades se interpretarían como:
 
-* **Sin prioridad**: Tareas sin planificar, en bandeja de entrada.
-* **D**: Tareas que deseamos hacer próximamente.
-* **C**: Tareas que hemos previsto realizar a lo largo del presente mes.
-* **B**: Tareas que tenemos previsto hacer durante esta semana.
-* **A**: Tareas a realizar hoy.
+* **Sin prioridad**: Tareas **sin planificar**, en bandeja de entrada.
+* **D**: Tareas que deseamos hacer **próximamente**.
+* **C**: Tareas que hemos previsto realizar **a lo largo del presente mes**.
+* **B**: Tareas que tenemos previsto hacer **durante esta semana**.
+* **A**: Tareas a realizar **hoy**.
 
 
 La ventaja de este tipo de planificación es que nos permite hacer revisiones periódicas y planificar las próximas acciones.
