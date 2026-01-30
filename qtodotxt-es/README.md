@@ -27,6 +27,9 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 - **Detección y autorecarga de tareas cuando el archivo todo.txt es modificado** desde otra aplicación. Antes, cuando se modificaba el archivo todo.txt desde fuera de QtodoTXT2, se mostraba una ventana de confirmación, lo cual era bastante molesto si, como yo, usas todo.txt por línea de comandos al mismo tiempo que con QtodoTXT2.
 - **Muestra en el panel de filtros de las tareas por fecha de vencimiento**. En la versión original sólo se mostraban los filtros de vencimiento si había alguna tarea que venciera en alguno de los plazos prefijados.
 - Algunas mejoras y correcciones menores adicionales.
+- **Mejora de rendimento** y resolución de problemas de bloqueos en hilos.
+- **Actualización del código** para evitar problemas con versiones modernas de python3.
+- **Panel Kanban** para gestión de progreso de proyectos (ver sección siguiente).
 
 
 ###PANEL KANBAN

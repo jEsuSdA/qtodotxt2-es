@@ -1,1 +1,0 @@
-# Archivo .pro de prueba mínimo
