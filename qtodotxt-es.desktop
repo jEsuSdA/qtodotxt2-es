@@ -1,0 +1,35 @@
+[Desktop Entry]
+# La versión de la especificación del archivo .desktop
+Version=1.1
+
+# El tipo de entrada. Para una aplicación, siempre es "Application".
+Type=Application
+
+# El nombre que aparecerá en el menú de aplicaciones.
+Name=QtodoTXT-es
+
+# Un nombre más genérico para la aplicación.
+GenericName=QtodoTXT-es
+
+# Un comentario o descripción breve que puede aparecer como tooltip.
+Comment=Gestor de tareas todo.txt
+
+# Forzamos el path de ejecución del programa.
+# Path=/opt/qtodotxt-es/
+
+# El comando que se ejecutará para lanzar la aplicación.
+# Usamos el nombre del lanzador que creamos en /usr/local/bin.
+# El '%f' permite que la aplicación abra un archivo si se arrastra sobre el icono
+# o se usa la opción "Abrir con...".
+Exec=qtodotxt-es %f
+
+# El nombre del icono, sin la extensión ni la ruta.
+# El sistema lo buscará en las carpetas estándar como /usr/share/pixmaps.
+Icon=qtodotxt
+
+# Indica si la aplicación debe ejecutarse en una ventana de terminal.
+Terminal=false
+
+# Las categorías del menú en las que aparecerá la aplicación.
+Categories=Utility;Office;
+
