@@ -18,7 +18,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 
 
 
-##CAMBIOS RESPECTO AL ORIGINAL
+## CAMBIOS RESPECTO AL ORIGINAL
 
 - **Versión en español** (intenté hacerlo con el módulo de traducción QML pero no hubo forma, así que la aplicación está traducida directamente en el código. Si te interesa la versión en tu idioma... ya sabes...)
 - **Cambio completo de iconos** usando los iconos del proyecto Papirus (en su versión e-Papirus)
@@ -32,7 +32,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 - **Panel Kanban** para gestión de progreso de proyectos (ver sección siguiente).
 
 
-###PANEL KANBAN
+### PANEL KANBAN
 
 En las últimas versiones he añadido una opción de vista en panel **KANBAN**. Esta vista permite planificar mejor cada proyecto, al ver todas sus tareas por columnas.
 
@@ -42,11 +42,11 @@ En concreto, y para entender mejor la forma de usarlo, has de tener en cuenta qu
 
 Así, las prioridades se interpretarían como:
 
-* **Sin prioridad**: Tareas sin planificar, en bandeja de entrada.
-* **D**: Tareas que deseamos hacer próximamente.
-* **C**: Tareas que hemos previsto realizar a lo largo del presente mes.
-* **B**: Tareas que tenemos previsto hacer durante esta semana.
-* **A**: Tareas a realizar hoy.
+* **Sin prioridad**: Tareas **sin planificar**, en bandeja de entrada.
+* **D**: Tareas que deseamos hacer **próximamente**.
+* **C**: Tareas que hemos previsto realizar **a lo largo del presente mes**.
+* **B**: Tareas que tenemos previsto hacer **durante esta semana**.
+* **A**: Tareas a realizar **hoy**.
 
 
 La ventaja de este tipo de planificación es que nos permite hacer revisiones periódicas y planificar las próximas acciones.
@@ -73,10 +73,10 @@ A su vez, QtodoTXT2 es un fork de QtodoTXT, que es el original.
 *   Eliminación del soporte para algunas opciones y tecnologías heredadas como la bandeja del sistema (systray).
 
 
-##INSTALACIÓN
+## INSTALACIÓN
 
 
-###Métodos mejorados
+### Métodos mejorados
 
 He desarrollado e incorporado al proyecto una serie de scripts para facilitar la instalación y desinstalación del programa:
 
@@ -102,7 +102,7 @@ He desarrollado e incorporado al proyecto una serie de scripts para facilitar la
 
 
 
-###Método manual
+### Método manual
 
 Basta con 
 
