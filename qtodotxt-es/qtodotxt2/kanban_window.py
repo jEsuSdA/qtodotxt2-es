@@ -49,6 +49,14 @@ class KanbanTaskWidget(QFrame):
 
         self.text_label.installEventFilter(self)
 
+    def update_data(self, task_data):
+        """Actualizar los datos de un widget existente sin destruirlo."""
+        self.task_data = task_data
+        self.line_index = task_data['line_index']
+        self.checkbox.setChecked(task_data['is_done'])
+        self.text_label.setText(self._format_task_text(task_data))
+        self._apply_priority_style(task_data['priority'], task_data['is_done'])
+
     def eventFilter(self, source, event):
         if source is self.text_label:
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
@@ -207,6 +215,7 @@ class KanbanWindow(QMainWindow):
 
         # --- estado de filtro ---
         self._project_widgets = {}          # project_name -> QWidget(block)
+        self._widget_pool = []              # widgets reutilizados entre rebuilds
         self._current_project_filter = ""   # texto actual
         self._filter_timer = QTimer(self)
         self._filter_timer.setSingleShot(True)
@@ -385,7 +394,14 @@ class KanbanWindow(QMainWindow):
     # Board build
     # -------------------------
     def _refresh_board(self):
-        # limpia layout y mapa
+        # 1. Recoger widgets de tarea existentes al pool (detach del parent)
+        self._widget_pool = []
+        for block in self._project_widgets.values():
+            for w in block.findChildren(KanbanTaskWidget):
+                w.setParent(None)
+                self._widget_pool.append(w)
+
+        # 2. Destruir project blocks (las columnas se destruyen con ellos)
         while self.projects_layout.count() > 0:
             child_item = self.projects_layout.takeAt(0)
             child = child_item.widget()
@@ -406,6 +422,11 @@ class KanbanWindow(QMainWindow):
             self._project_widgets[project_name] = project_block
 
         self.projects_layout.addStretch()
+
+        # 3. Destruir widgets sobrantes del pool
+        for w in self._widget_pool:
+            w.deleteLater()
+        self._widget_pool.clear()
 
         # reaplica filtro actual tras reconstrucción
         if self._norm(self._current_project_filter):
@@ -445,7 +466,11 @@ class KanbanWindow(QMainWindow):
         for prio, tasks in project_data['tasks'].items():
             if prio in block_columns:
                 for task_data in tasks:
-                    task_widget = KanbanTaskWidget(task_data)
+                    if self._widget_pool:
+                        task_widget = self._widget_pool.pop()
+                        task_widget.update_data(task_data)
+                    else:
+                        task_widget = KanbanTaskWidget(task_data)
                     block_columns[prio].add_task(task_widget)
 
         # Altura base (modo normal)
@@ -472,6 +497,47 @@ class KanbanWindow(QMainWindow):
     def on_task_toggled(self, line_index, is_done):
         """Handle task completion toggle."""
         self.controller.toggle_task_done(line_index, is_done)
+
+    def update_task_widget(self, line_index, is_done=None, priority=None):
+        """Actualizar widget(s) in-place sin reconstruir el tablero."""
+        task = self.main_controller.allTasks[line_index]
+        for block in self._project_widgets.values():
+            for w in block.findChildren(KanbanTaskWidget):
+                if w.line_index == line_index:
+                    w.task_data['text'] = task.text
+                    if is_done is not None:
+                        w.task_data['is_done'] = is_done
+                    if priority is not None:
+                        w.task_data['priority'] = priority
+                    w.update_data(w.task_data)
+
+    def move_task_widget(self, line_index, new_priority):
+        """Mover widget entre columnas sin reconstruir el tablero."""
+        task = self.main_controller.allTasks[line_index]
+        for block in self._project_widgets.values():
+            widget = None
+            old_column = None
+            for col in block.findChildren(KanbanColumnWidget):
+                for w in col.findChildren(KanbanTaskWidget):
+                    if w.line_index == line_index:
+                        widget = w
+                        old_column = col
+                        break
+                if widget:
+                    break
+            if not widget:
+                continue
+            new_column = None
+            for col in block.findChildren(KanbanColumnWidget):
+                if col.priority_key == new_priority:
+                    new_column = col
+                    break
+            if new_column and old_column != new_column:
+                old_column.task_layout.removeWidget(widget)
+                new_column.add_task(widget)
+            widget.task_data['text'] = task.text
+            widget.task_data['priority'] = new_priority if new_priority != 'NP' else ''
+            widget.update_data(widget.task_data)
 
 #    def _check_file_changes(self):
 #        if hasattr(self.main_controller._file, 'filename') and self.main_controller._file.filename:

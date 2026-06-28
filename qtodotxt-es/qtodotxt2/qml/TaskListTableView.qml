@@ -55,7 +55,6 @@ TableView {
 
     property int lastIndex: 0
     property bool editing: (currentItem !== null ? currentItem.state === "edit" : false)
-    onEditingChanged: console.log("editing", editing)
 
     selection.onSelectionChanged: {
         if (_fixingSelection) return
@@ -102,7 +101,6 @@ TableView {
         standardButtons: StandardButton.Yes | StandardButton.No
         onYes: {
             taskListView.storeSelection()
-            console.log("deleting tasks %1".arg(getSelectedIndexes()))
             mainController.deleteTasks(getSelectedIndexes())
             taskListView.restoreSelection()
         }

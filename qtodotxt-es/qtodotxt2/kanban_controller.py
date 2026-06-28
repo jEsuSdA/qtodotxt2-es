@@ -14,6 +14,7 @@ class KanbanController(QtCore.QObject):
         super().__init__()
         self._main = main_controller
         self._kanban_data = {}
+        self._self_modified = False
 
         self._columns = {
             'NP': 'Bandeja de Entrada',
@@ -58,12 +59,18 @@ class KanbanController(QtCore.QObject):
     # Debounce rebuild
     # -------------------------
     def _schedule_rebuild(self, *args, **kwargs):
+        # Skipar rebuild si el cambio proviene del propio Kanban (update incremental)
+        if self._self_modified:
+            return
         # No reconstruir el tablero si la ventana no está visible
         kanban_window = getattr(self._main, 'kanban_window', None)
         if kanban_window is None or not kanban_window.isVisible():
             return
         # Reinicia el timer: muchos cambios -> 1 rebuild
         self._rebuild_timer.start()
+
+    def _clear_self_modified(self):
+        self._self_modified = False
 
     def _rebuild_now(self):
         self._generate_kanban_data()
@@ -155,6 +162,7 @@ class KanbanController(QtCore.QObject):
     # -------------------------
     def update_task_priority(self, line_index, new_priority):
         """Update task priority by modifying task text (priority property is read-only)."""
+        self._self_modified = True
         task = self._main.allTasks[line_index]
         text = task.text
 
@@ -168,10 +176,23 @@ class KanbanController(QtCore.QObject):
 
         task.text = text
 
+        # Update incremental: mover widget entre columnas sin rebuild
+        kanban_window = getattr(self._main, 'kanban_window', None)
+        if kanban_window and kanban_window.isVisible():
+            kanban_window.move_task_widget(line_index, new_priority)
+        QtCore.QTimer.singleShot(0, self._clear_self_modified)
+
     def toggle_task_done(self, line_index, is_done):
         """Toggle task completion status."""
+        self._self_modified = True
         task = self._main.allTasks[line_index]
         if is_done:
             task.setCompleted()
         else:
             task.setPending()
+
+        # Update incremental: actualizar widget in-place sin rebuild
+        kanban_window = getattr(self._main, 'kanban_window', None)
+        if kanban_window and kanban_window.isVisible():
+            kanban_window.update_task_widget(line_index, is_done=is_done)
+        QtCore.QTimer.singleShot(0, self._clear_self_modified)

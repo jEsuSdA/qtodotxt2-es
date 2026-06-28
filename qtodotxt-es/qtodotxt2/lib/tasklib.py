@@ -198,7 +198,6 @@ class Task(QtCore.QObject):
         if word.startswith('due:'):
             self._due = _parseDateTime(word[4:])
             if not self._due:
-                print("Error parsing due date '{}'".format(word))
                 self._due_error = word[4:]
         elif word.startswith('t:'):
             self._parseFuture(word)
@@ -208,7 +207,6 @@ class Task(QtCore.QObject):
     def _parseFuture(self, word):
         self._threshold = _parseDateTime(word[2:])
         if not self._threshold:
-            print("Error parsing threshold '{}'".format(word))
             self.threshold_error = word[2:]
         else:
             if self._threshold > datetime.today():
@@ -222,15 +220,11 @@ class Task(QtCore.QObject):
             if re.match('^[1-9]+[bdwmy]', word[5:]):
                 # send all digits as increment and last char as interval
                 self.recursion = Recursion(RecursiveMode.originalDueDate, word[5:-1], word[-1])
-            else:
-                print("Error parsing recurrence '{}'".format(word))
         # Completion mode
         else:
             # same as above for "normal recurrence" (without leading '+')
             if re.match('^[1-9]+[bdwmy]', word[4:]):
                 self.recursion = Recursion(RecursiveMode.completionDate, word[4:-1], word[-1])
-            else:
-                print("Error parsing recurrence '{}'".format(word))
     
     @property
     def due(self):

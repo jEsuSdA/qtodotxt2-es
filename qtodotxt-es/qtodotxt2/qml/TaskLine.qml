@@ -73,7 +73,6 @@ Loader {
 
             onActiveFocusChanged: {
                 if (!activeFocus) {
-                    console.log("lost focus")
                     taskLine.state = "show"
                 }
             }
