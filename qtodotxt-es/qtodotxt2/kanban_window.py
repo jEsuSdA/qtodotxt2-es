@@ -408,7 +408,11 @@ class KanbanWindow(QMainWindow):
         self.projects_layout.addStretch()
 
         # reaplica filtro actual tras reconstrucción
-        self._apply_project_filter()
+        if self._norm(self._current_project_filter):
+            self._apply_project_filter()
+        else:
+            total = len(self._project_widgets)
+            self.filter_count_label.setText(f"Mostrando {total}/{total}")
 
     def _create_project_block(self, project_name, project_data):
         block = QWidget()

@@ -198,7 +198,6 @@ class MainController(QtCore.QObject):
             self.filtersController.setFilters(filters)
         tasks = self.filtersController.filter(self._file.tasks)
         tasks = getattr(tasklib.TaskSorter, self._sortingMode)(tasks)
-        print("filteredTasks about to change in python")
         self._filteredTasks = tasks
         self.filteredTasksChanged.emit()
 
@@ -343,7 +342,8 @@ class MainController(QtCore.QObject):
         if not hasattr(self, "kanban_window") or self.kanban_window is None:
             self.kanban_window = KanbanWindow(self)
         else:
-            # si ya existe, solo la traemos al frente
+            # si ya existe, la traemos al frente
+            self.kanban_controller._rebuild_now()
             self.kanban_window.raise_()
             self.kanban_window.activateWindow()
 

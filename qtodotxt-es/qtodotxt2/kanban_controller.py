@@ -58,6 +58,10 @@ class KanbanController(QtCore.QObject):
     # Debounce rebuild
     # -------------------------
     def _schedule_rebuild(self, *args, **kwargs):
+        # No reconstruir el tablero si la ventana no está visible
+        kanban_window = getattr(self._main, 'kanban_window', None)
+        if kanban_window is None or not kanban_window.isVisible():
+            return
         # Reinicia el timer: muchos cambios -> 1 rebuild
         self._rebuild_timer.start()
 
@@ -164,9 +168,6 @@ class KanbanController(QtCore.QObject):
 
         task.text = text
 
-        # Guardar sin bloquear reentrando en el mismo tick
-        QtCore.QTimer.singleShot(0, self._main.save)
-
     def toggle_task_done(self, line_index, is_done):
         """Toggle task completion status."""
         task = self._main.allTasks[line_index]
@@ -174,5 +175,3 @@ class KanbanController(QtCore.QObject):
             task.setCompleted()
         else:
             task.setPending()
-
-        QtCore.QTimer.singleShot(0, self._main.save)
