@@ -4,7 +4,7 @@
 
 # Nombre del paquete (sin espacios, minúsculas, guiones permitidos)
 PKG_NAME="qtodotxt-es"
-VERSION="20260130" # Puedes cambiar esto por la versión real
+VERSION="20260628" # Puedes cambiar esto por la versión real
 ARCH="all"
 MAINTAINER="jEsuSdA <info@jesusda.com>"
 DESC="Gestor de tareas todo.txt basado en Python y Qt (QML)."

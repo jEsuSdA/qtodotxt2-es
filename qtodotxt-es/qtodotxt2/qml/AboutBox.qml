@@ -15,6 +15,7 @@ Dialog {
  (see <a href="http://todotxt.com">http://todotxt.com</a>)</p>
 2015-2017 Copyright &copy; QTT Development Team<br/>
 2025-2026 Copyright &copy; jEsuSdA 8)<br/>
+<p><b>Versión: 20260628</b></p>
 <h2>Links</h2>
 <ul>
 <li>Project Page: <a href="https://github.com/QTodoTxt/QTodoTxt2">https://github.com/QTodoTxt/QTodoTxt2</a></li>
