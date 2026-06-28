@@ -28,7 +28,7 @@ class KanbanController(QtCore.QObject):
         # Debounce: regenerar kanban una sola vez aunque lleguen muchos cambios seguidos
         self._rebuild_timer = QtCore.QTimer(self)
         self._rebuild_timer.setSingleShot(True)
-        self._rebuild_timer.setInterval(250)  # 200-400ms suele ir bien
+        self._rebuild_timer.setInterval(250)
         self._rebuild_timer.timeout.connect(self._rebuild_now)
 
         # Conexiones (evita duplicados si reutilizas la instancia)
@@ -66,11 +66,9 @@ class KanbanController(QtCore.QObject):
         kanban_window = getattr(self._main, 'kanban_window', None)
         if kanban_window is None or not kanban_window.isVisible():
             return
-        # Reinicia el timer: muchos cambios -> 1 rebuild
-        self._rebuild_timer.start()
-
-    def _clear_self_modified(self):
-        self._self_modified = False
+        # Iniciar timer solo si no está ya activo (evita reinicios continuos)
+        if not self._rebuild_timer.isActive():
+            self._rebuild_timer.start()
 
     def _rebuild_now(self):
         self._generate_kanban_data()
@@ -85,7 +83,7 @@ class KanbanController(QtCore.QObject):
         kanban_priorities = self._kanban_priorities
         all_tasks = self._main.allTasks
 
-        for line_index, task in enumerate(all_tasks):
+        for task in all_tasks:
             # Filtra prioridades fuera de A-D (pero permite vacío => NP)
             priority = task.priority if hasattr(task, 'priority') else ''
             if priority and priority not in kanban_priorities:
@@ -116,7 +114,8 @@ class KanbanController(QtCore.QObject):
                 'text': task.text,
                 'priority': priority,
                 'is_done': task.is_complete if hasattr(task, 'is_complete') else False,
-                'line_index': line_index,
+                'task_id': str(id(task)),
+                'task_ref': task,
                 'contexts': getattr(task, 'contexts', []),
                 'projects': getattr(task, 'projects', [])
             }
@@ -160,39 +159,53 @@ class KanbanController(QtCore.QObject):
     # -------------------------
     # Mutations coming from Kanban
     # -------------------------
-    def update_task_priority(self, line_index, new_priority):
+    def _find_task_by_id(self, task_id):
+        for task in self._main.allTasks:
+            if str(id(task)) == task_id:
+                return task
+        return None
+
+    def update_task_priority(self, task_id, new_priority):
         """Update task priority by modifying task text (priority property is read-only)."""
         self._self_modified = True
-        task = self._main.allTasks[line_index]
-        text = task.text
+        try:
+            task = self._find_task_by_id(task_id)
+            if not task:
+                return
+            text = task.text
 
-        # Remove existing priority
-        if re.match(r'^\([A-Z]\) ', text):
-            text = text[4:]  # Remove '(A) '
+            # Remove existing priority
+            if re.match(r'^\([A-Z]\) ', text):
+                text = text[4:]  # Remove '(A) '
 
-        # Add new priority if not NP
-        if new_priority != 'NP':
-            text = f'({new_priority}) {text}'
+            # Add new priority if not NP
+            if new_priority != 'NP':
+                text = f'({new_priority}) {text}'
 
-        task.text = text
+            task.text = text
 
-        # Update incremental: mover widget entre columnas sin rebuild
-        kanban_window = getattr(self._main, 'kanban_window', None)
-        if kanban_window and kanban_window.isVisible():
-            kanban_window.move_task_widget(line_index, new_priority)
-        QtCore.QTimer.singleShot(0, self._clear_self_modified)
+            # Update incremental en el Kanban
+            kanban_window = getattr(self._main, 'kanban_window', None)
+            if kanban_window and kanban_window.isVisible():
+                kanban_window.move_task_widget(task_id, new_priority)
+        finally:
+            self._self_modified = False
 
-    def toggle_task_done(self, line_index, is_done):
+    def toggle_task_done(self, task_id, is_done):
         """Toggle task completion status."""
         self._self_modified = True
-        task = self._main.allTasks[line_index]
-        if is_done:
-            task.setCompleted()
-        else:
-            task.setPending()
+        try:
+            task = self._find_task_by_id(task_id)
+            if not task:
+                return
+            if is_done:
+                task.setCompleted()
+            else:
+                task.setPending()
 
-        # Update incremental: actualizar widget in-place sin rebuild
-        kanban_window = getattr(self._main, 'kanban_window', None)
-        if kanban_window and kanban_window.isVisible():
-            kanban_window.update_task_widget(line_index, is_done=is_done)
-        QtCore.QTimer.singleShot(0, self._clear_self_modified)
+            # Update incremental en el Kanban
+            kanban_window = getattr(self._main, 'kanban_window', None)
+            if kanban_window and kanban_window.isVisible():
+                kanban_window.update_task_widget(task_id, is_done=is_done)
+        finally:
+            self._self_modified = False

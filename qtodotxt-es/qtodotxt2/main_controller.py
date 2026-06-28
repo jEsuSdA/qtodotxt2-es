@@ -291,6 +291,12 @@ class MainController(QtCore.QObject):
         except Exception as ex:
             self.showError(self.tr("Error opening file: {}.\n Exception:{}").format(filename, ex))
             return
+        # Asegurar que _fileModified está conectado tras load()
+        try:
+            self._file.fileModified.disconnect(self._fileModified)
+        except Exception:
+            pass
+        self._file.fileModified.connect(self._fileModified)
         self._loadFileToUI()
         self._settings.setValue("last_open_file", filename)
         self.updateRecentFile()
@@ -313,6 +319,9 @@ class MainController(QtCore.QObject):
         self.applyFilters()
         self._updateCompletionStrings()
         self._updateFilterTree()
+        # Forzar rebuild del Kanban tras recarga (los id() de Task cambian)
+        if hasattr(self, 'kanban_controller') and self.kanban_controller is not None:
+            self.kanban_controller._rebuild_now()
 
     @QtCore.pyqtSlot('QModelIndexList')
     @QtCore.pyqtSlot('QVariantList')

@@ -24,7 +24,8 @@ class KanbanTaskWidget(QFrame):
     def __init__(self, task_data, parent=None):
         super().__init__(parent)
         self.task_data = task_data
-        self.line_index = task_data['line_index']
+        self.task_id = task_data['task_id']
+        self.task_ref = task_data['task_ref']
         self.setAcceptDrops(False)
         self.setMouseTracking(True)
 
@@ -52,7 +53,8 @@ class KanbanTaskWidget(QFrame):
     def update_data(self, task_data):
         """Actualizar los datos de un widget existente sin destruirlo."""
         self.task_data = task_data
-        self.line_index = task_data['line_index']
+        self.task_id = task_data['task_id']
+        self.task_ref = task_data['task_ref']
         self.checkbox.setChecked(task_data['is_done'])
         self.text_label.setText(self._format_task_text(task_data))
         self._apply_priority_style(task_data['priority'], task_data['is_done'])
@@ -115,7 +117,7 @@ class KanbanTaskWidget(QFrame):
             return
         drag = QDrag(self)
         mime_data = QMimeData()
-        mime_data.setText(str(self.line_index))
+        mime_data.setText(self.task_id)
         drag.setMimeData(mime_data)
         pixmap = QPixmap(self.size())
         pixmap.fill(Qt.transparent)
@@ -133,13 +135,13 @@ class KanbanTaskWidget(QFrame):
         while parent and not isinstance(parent, KanbanColumnWidget):
             parent = parent.parent()
         if parent:
-            parent.task_toggled.emit(self.line_index, checked)
+            parent.task_toggled.emit(self.task_id, checked)
 
 
 
 class KanbanColumnWidget(QWidget):
-    task_dropped = pyqtSignal(int, str)
-    task_toggled = pyqtSignal(int, bool)
+    task_dropped = pyqtSignal(str, str)
+    task_toggled = pyqtSignal(str, bool)
     HEADER_COLORS = {'A': '#e74c3c', 'B': '#f39c12', 'C': '#f1c40f', 'D': '#8fb021', 'NP': '#7f8c8d'}
 
     def __init__(self, priority_key, title, parent=None):
@@ -188,17 +190,17 @@ class KanbanColumnWidget(QWidget):
                 child.deleteLater()
 
     def dragEnterEvent(self, event):
-        # Acepta sólo drags que tengan un texto numérico (line_index)
+        # Acepta sólo drags que tengan texto (task_id)
         txt = event.mimeData().text() if event.mimeData() else ""
-        if txt.isdigit():
+        if txt:
             event.acceptProposedAction()
 
     def dropEvent(self, event):
         txt = event.mimeData().text() if event.mimeData() else ""
-        if not txt.isdigit():
+        if not txt:
             return
-        line_index = int(txt)
-        self.task_dropped.emit(line_index, self.priority_key)
+        task_id = txt
+        self.task_dropped.emit(task_id, self.priority_key)
         event.acceptProposedAction()
 
 
@@ -278,11 +280,6 @@ class KanbanWindow(QMainWindow):
             self.controller.kanbanDataChanged.connect(self._refresh_board)
 
         self._refresh_board()
-
-        #self.timer = QTimer()
-        #self.timer.timeout.connect(self._check_file_changes)
-        #self.timer.start(5000)
-        #self.last_modified = 0
 
     # -------------------------
     # Normalización de texto (sin acentos, case-insensitive)
@@ -473,13 +470,10 @@ class KanbanWindow(QMainWindow):
                         task_widget = KanbanTaskWidget(task_data)
                     block_columns[prio].add_task(task_widget)
 
-        # Altura base (modo normal)
-        max_content_height = 0
-        for column in block_columns.values():
-            max_content_height = max(max_content_height, column.task_container.sizeHint().height())
-
-        target_height = max(self.MIN_CONTENT_HEIGHT, max_content_height)
-        target_height = min(self.MAX_CONTENT_HEIGHT, target_height)
+        # Altura base: estimacion sin sizeHint() (mucho mas rapida)
+        max_tasks = max(len(tasks) for tasks in project_data['tasks'].values())
+        target_height = max(50 * max_tasks, self.MIN_CONTENT_HEIGHT)
+        target_height = min(target_height, self.MAX_CONTENT_HEIGHT)
 
         for column in block_columns.values():
             column.scroll_area.setMinimumHeight(target_height)
@@ -490,36 +484,34 @@ class KanbanWindow(QMainWindow):
         block_layout.addWidget(columns_container)
         return block
 
-    def on_task_moved(self, line_index, new_priority):
+    def on_task_moved(self, task_id, new_priority):
         """Handle task moved between columns."""
-        self.controller.update_task_priority(line_index, new_priority)
+        self.controller.update_task_priority(task_id, new_priority)
 
-    def on_task_toggled(self, line_index, is_done):
+    def on_task_toggled(self, task_id, is_done):
         """Handle task completion toggle."""
-        self.controller.toggle_task_done(line_index, is_done)
+        self.controller.toggle_task_done(task_id, is_done)
 
-    def update_task_widget(self, line_index, is_done=None, priority=None):
+    def update_task_widget(self, task_id, is_done=None, priority=None):
         """Actualizar widget(s) in-place sin reconstruir el tablero."""
-        task = self.main_controller.allTasks[line_index]
         for block in self._project_widgets.values():
             for w in block.findChildren(KanbanTaskWidget):
-                if w.line_index == line_index:
-                    w.task_data['text'] = task.text
+                if w.task_id == task_id:
+                    w.task_data['text'] = w.task_ref.text
                     if is_done is not None:
                         w.task_data['is_done'] = is_done
                     if priority is not None:
                         w.task_data['priority'] = priority
                     w.update_data(w.task_data)
 
-    def move_task_widget(self, line_index, new_priority):
+    def move_task_widget(self, task_id, new_priority):
         """Mover widget entre columnas sin reconstruir el tablero."""
-        task = self.main_controller.allTasks[line_index]
         for block in self._project_widgets.values():
             widget = None
             old_column = None
             for col in block.findChildren(KanbanColumnWidget):
                 for w in col.findChildren(KanbanTaskWidget):
-                    if w.line_index == line_index:
+                    if w.task_id == task_id:
                         widget = w
                         old_column = col
                         break
@@ -535,7 +527,7 @@ class KanbanWindow(QMainWindow):
             if new_column and old_column != new_column:
                 old_column.task_layout.removeWidget(widget)
                 new_column.add_task(widget)
-            widget.task_data['text'] = task.text
+            widget.task_data['text'] = widget.task_ref.text
             widget.task_data['priority'] = new_priority if new_priority != 'NP' else ''
             widget.update_data(widget.task_data)
 
