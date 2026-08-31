@@ -147,6 +147,23 @@ class TestKanbanSync(unittest.TestCase):
         self.assertFalse(task.is_complete)
         self.assertFalse(task.text.startswith("x "), task.text)
 
+    def test_edit_uses_diff_not_full_rebuild(self):
+        window = self.mc.kanban_window
+        calls = {"full": 0, "diff": 0}
+        orig_full = window._refresh_board
+        orig_diff = window._apply_data
+        window._refresh_board = lambda: calls.__setitem__("full", calls["full"] + 1)
+        window._apply_data = lambda d: calls.__setitem__("diff", calls["diff"] + 1)
+        try:
+            other = self.task_by_text_part("Tarea cuatro")
+            other.text = other.text + " @z"
+            self.wait_rebuild()
+        finally:
+            window._refresh_board = orig_full
+            window._apply_data = orig_diff
+        self.assertGreaterEqual(calls["diff"], 1, "la edición no pasó por el diff")
+        self.assertEqual(calls["full"], 0, "la edición disparó un rebuild completo")
+
     # ---------------- 5. Convergencia tras rebuild ----------------
 
     def test_rebuild_converges_after_drag(self):
@@ -172,6 +189,78 @@ class TestKanbanSync(unittest.TestCase):
         # restaurar prioridad original de ambas tareas
         self.mc.kanban_controller.update_task_priority(task_id, "A")
         other.text = other.text.replace(" @extra", "")
+        self.wait_rebuild()
+
+    # ---------------- 6. Diff incremental: casos específicos ----------------
+
+    def test_diff_moves_card_between_project_blocks(self):
+        task = self.task_by_text_part("Tarea tres")
+        tid = str(id(task))
+        task.text = task.text + " +ProyectoSyncExtra"
+        self.wait_rebuild()
+
+        ids_new = self.kanban_ids("ProyectoSyncExtra", "C")
+        self.assertIsNotNone(ids_new)
+        self.assertIn(tid, ids_new)
+        # integridad: un widget por tarea registrada en el bloque nuevo
+        block = self.mc.kanban_window._project_widgets["ProyectoSyncExtra"]
+        self.assertEqual(len(block._cards), len(block.findChildren(KanbanTaskWidget)))
+
+        # limpiar: la tarjeta debe salir del bloque extra
+        task.text = task.text.replace(" +ProyectoSyncExtra", "")
+        self.wait_rebuild()
+        block = self.mc.kanban_window._project_widgets.get("ProyectoSyncExtra")
+        if block is not None:
+            self.assertNotIn(tid, block._cards)
+
+    def test_no_duplicate_cards_after_drag_then_diff(self):
+        task = self.task_by_text_part("Tarea dos")
+        tid = str(id(task))
+        # dos movimientos incrementales seguidos y luego un diff
+        self.mc.kanban_controller.update_task_priority(tid, "NP")
+        self.mc.kanban_controller.update_task_priority(tid, "B")
+        other = self.task_by_text_part("Tarea cuatro")
+        other.text = other.text + " @x"
+        self.wait_rebuild()
+
+        block = self.mc.kanban_window._project_widgets["ProyectoSync1"]
+        widgets = block.findChildren(KanbanTaskWidget)
+        self.assertEqual(len(block._cards), len(widgets),
+                         "registros _cards y widgets reales desincronizados")
+        ids = [w.task_id for w in widgets]
+        self.assertEqual(len(ids), len(set(ids)), "tarjetas duplicadas en el bloque")
+
+        other.text = other.text.replace(" @x", "")
+        self.wait_rebuild()
+
+    def test_diff_restores_column_order(self):
+        i1 = self.mc.newTask("Ordena uno +ProyectoSyncOrden")
+        i2 = self.mc.newTask("Ordena dos +ProyectoSyncOrden")
+        i3 = self.mc.newTask("Ordena tres +ProyectoSyncOrden")
+        tasks = [self.mc.filteredTasks[i] for i in (i1, i2, i3)]
+        self.wait_rebuild()
+
+        col = self.column_widget("ProyectoSyncOrden", "NP")
+        self.assertIsNotNone(col)
+        layout = col.task_layout
+
+        # desordenar manualmente: última tarjeta al frente
+        last_card_item = layout.takeAt(layout.count() - 2)
+        layout.insertWidget(0, last_card_item.widget())
+
+        # un diff posterior debe restaurar el orden de los datos
+        other = self.task_by_text_part("Tarea cuatro")
+        other.text = other.text + " @y"
+        self.wait_rebuild()
+
+        data_ids = [t["task_id"] for t in
+                    self.mc.kanban_controller.kanbanData["ProyectoSyncOrden"]["tasks"]["NP"]]
+        widget_ids = [w.task_id for w in col.findChildren(KanbanTaskWidget)]
+        self.assertEqual(data_ids, widget_ids, "el diff no restauró el orden de la columna")
+
+        # limpieza
+        self.mc.deleteTasks(tasks)
+        other.text = other.text.replace(" @y", "")
         self.wait_rebuild()
 
 

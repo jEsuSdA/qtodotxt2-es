@@ -1,3 +1,4 @@
+import logging
 import sys
 import re
 import unicodedata
@@ -8,6 +9,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QMimeData, pyqtSignal, QTimer, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter, QMouseEvent
+
+logger = logging.getLogger(__name__)
 
 
 def format_task_html(text):
@@ -237,7 +240,9 @@ class KanbanWindow(QMainWindow):
 
         # --- estado de filtro ---
         self._project_widgets = {}          # project_name -> QWidget(block)
-        self._widget_pool = []              # widgets reutilizados entre rebuilds
+        self._card_pool = []                # pool persistente de tarjetas entre actualizaciones
+        self._card_pool_max = 1000          # tope de tarjetas recicladas en memoria
+        self._board_built = False           # primer build -> rebuild completo
         self._current_project_filter = ""   # texto actual
         self._filter_timer = QTimer(self)
         self._filter_timer.setSingleShot(True)
@@ -297,7 +302,7 @@ class KanbanWindow(QMainWindow):
 
         self.controller = main_controller.kanban_controller if hasattr(main_controller, 'kanban_controller') else None
         if self.controller:
-            self.controller.kanbanDataChanged.connect(self._refresh_board)
+            self.controller.kanbanDataChanged.connect(self._on_kanban_data_changed)
 
         self._refresh_board()
 
@@ -416,15 +421,32 @@ class KanbanWindow(QMainWindow):
             self.controller.consume_dirty()
 
     # -------------------------
-    # Board build
+    # Board build / update
     # -------------------------
+    def _on_kanban_data_changed(self):
+        """Aplica los datos al tablero: diff incremental con fallback a rebuild completo."""
+        if self.controller is None:
+            return
+        kanban_data = self.controller.kanbanData or {}
+        try:
+            if not self._board_built:
+                self._refresh_board()
+                return
+            self._apply_data(kanban_data)
+        except Exception:
+            logger.exception("Diff incremental falló; aplicando rebuild completo")
+            self._refresh_board()
+
     def _refresh_board(self):
-        # 1. Recoger widgets de tarea existentes al pool (detach del parent)
-        self._widget_pool = []
+        # Rebuild completo: red de seguridad y primera construcción.
+        # 1. Reciclar todas las tarjetas al pool persistente
         for block in self._project_widgets.values():
-            for w in block.findChildren(KanbanTaskWidget):
-                w.setParent(None)
-                self._widget_pool.append(w)
+            cards = getattr(block, '_cards', None)
+            if cards:
+                for w in list(cards.values()):
+                    self._recycle_card(w)
+                cards.clear()
+                getattr(block, '_card_cols', {}).clear()
 
         # 2. Destruir project blocks (las columnas se destruyen con ellos)
         while self.projects_layout.count() > 0:
@@ -447,11 +469,7 @@ class KanbanWindow(QMainWindow):
             self._project_widgets[project_name] = project_block
 
         self.projects_layout.addStretch()
-
-        # 3. Destruir widgets sobrantes del pool
-        for w in self._widget_pool:
-            w.deleteLater()
-        self._widget_pool.clear()
+        self._board_built = True
 
         # reaplica filtro actual tras reconstrucción
         if self._norm(self._current_project_filter):
@@ -459,6 +477,142 @@ class KanbanWindow(QMainWindow):
         else:
             total = len(self._project_widgets)
             self.filter_count_label.setText(f"Mostrando {total}/{total}")
+
+    def _apply_data(self, kanban_data):
+        """Actualización diferencial: crea/elimina bloques, mueve y actualiza tarjetas."""
+        # proyectos efectivos (la bandeja de entrada vacía no muestra bloque)
+        effective = {}
+        for name, pdata in kanban_data.items():
+            if name == '(Sin Proyecto)' and not any(pdata['tasks'].values()):
+                continue
+            effective[name] = pdata
+
+        # actualizar existentes o crear nuevos
+        for name, pdata in effective.items():
+            block = self._project_widgets.get(name)
+            if block is None or not hasattr(block, '_cards'):
+                self._remove_block(name)
+                block = self._create_project_block(name, pdata)
+                self._project_widgets[name] = block
+                self.projects_layout.addWidget(block)
+            else:
+                self._update_project_block(block, pdata)
+
+        # eliminar bloques que ya no deben estar
+        for name in list(self._project_widgets.keys()):
+            if name not in effective:
+                self._remove_block(name)
+
+        # reordenar bloques según el orden de los datos
+        self._reorder_projects(list(effective.keys()))
+
+        # reaplica filtro actual tras actualización (igual que _refresh_board)
+        if self._norm(self._current_project_filter):
+            self._apply_project_filter()
+        else:
+            total = len(self._project_widgets)
+            self.filter_count_label.setText(f"Mostrando {total}/{total}")
+
+    def _update_project_block(self, block, project_data):
+        """Diff de tarjetas de un bloque: altas, bajas, cambios de columna, datos y orden."""
+        columns = block._columns
+        cards = block._cards
+        card_cols = block._card_cols
+
+        # conjunto deseado: task_id -> (prio, task_data)
+        desired = {}
+        for prio, tasks in project_data['tasks'].items():
+            if prio not in columns:
+                continue
+            for td in tasks:
+                desired[td['task_id']] = (prio, td)
+
+        # 1) retirar tarjetas que ya no corresponden
+        for tid in list(cards.keys()):
+            if tid not in desired:
+                widget = cards.pop(tid)
+                card_cols.pop(tid, None)
+                self._recycle_card(widget)
+
+        # 2) añadir nuevas, mover entre columnas y actualizar datos
+        seen = set()
+        for prio, tasks in project_data['tasks'].items():
+            if prio not in columns:
+                continue
+            column = columns[prio]
+            for td in tasks:
+                tid = td['task_id']
+                if tid in seen:
+                    continue
+                seen.add(tid)
+                widget = cards.get(tid)
+                if widget is None:
+                    widget = self._obtain_card(td)
+                    cards[tid] = widget
+                    card_cols[tid] = prio
+                    column.add_task(widget)
+                elif card_cols.get(tid) != prio:
+                    old_column = columns.get(card_cols.get(tid))
+                    if old_column is not None:
+                        old_column.task_layout.removeWidget(widget)
+                    column.add_task(widget)
+                    card_cols[tid] = prio
+                widget.update_data(td)
+
+        # 3) reordenar dentro de cada columna según el orden de los datos
+        for prio, tasks in project_data['tasks'].items():
+            if prio not in columns:
+                continue
+            layout = columns[prio].task_layout
+            for pos, td in enumerate(tasks):
+                tid = td['task_id']
+                widget = cards.get(tid)
+                if widget is None or card_cols.get(tid) != prio:
+                    continue
+                if layout.indexOf(widget) != pos:
+                    layout.insertWidget(pos, widget)
+
+    def _reorder_projects(self, ordered_names):
+        """Recoloca los bloques para reflejar el orden de los datos (el stretch queda al final)."""
+        layout = self.projects_layout
+        for idx, name in enumerate(ordered_names):
+            block = self._project_widgets.get(name)
+            if block is None:
+                continue
+            target = min(idx, layout.count() - 1)
+            if layout.indexOf(block) != target:
+                layout.insertWidget(target, block)
+
+    def _remove_block(self, name):
+        block = self._project_widgets.pop(name, None)
+        if block is None:
+            return
+        cards = getattr(block, '_cards', None)
+        if cards:
+            for w in list(cards.values()):
+                self._recycle_card(w)
+            cards.clear()
+            getattr(block, '_card_cols', {}).clear()
+        self.projects_layout.removeWidget(block)
+        block.setParent(None)
+        block.deleteLater()
+
+    def _obtain_card(self, task_data):
+        """Tarjeta del pool persistente o nueva; siempre actualizada con los datos dados."""
+        if self._card_pool:
+            widget = self._card_pool.pop()
+        else:
+            widget = KanbanTaskWidget(task_data)
+        widget.update_data(task_data)
+        return widget
+
+    def _recycle_card(self, widget):
+        """Devuelve una tarjeta al pool persistente (o la destruye si el tope se alcanzó)."""
+        widget.setParent(None)
+        if len(self._card_pool) < self._card_pool_max:
+            self._card_pool.append(widget)
+        else:
+            widget.deleteLater()
 
     def _create_project_block(self, project_name, project_data):
         block = QWidget()
@@ -488,15 +642,18 @@ class KanbanWindow(QMainWindow):
                 block_columns[prio] = column
                 columns_layout.addWidget(column)
 
+        # registros para el diff incremental
+        block._columns = block_columns
+        block._cards = {}
+        block._card_cols = {}
+
         for prio, tasks in project_data['tasks'].items():
             if prio in block_columns:
                 for task_data in tasks:
-                    if self._widget_pool:
-                        task_widget = self._widget_pool.pop()
-                        task_widget.update_data(task_data)
-                    else:
-                        task_widget = KanbanTaskWidget(task_data)
-                    block_columns[prio].add_task(task_widget)
+                    widget = self._obtain_card(task_data)
+                    block._cards[task_data['task_id']] = widget
+                    block._card_cols[task_data['task_id']] = prio
+                    block_columns[prio].add_task(widget)
 
         # Altura base: estimacion sin sizeHint() (mucho mas rapida)
         max_tasks = max(len(tasks) for tasks in project_data['tasks'].values())
@@ -547,6 +704,11 @@ class KanbanWindow(QMainWindow):
                     break
             if not widget:
                 continue
+            # mantener los registros del diff coherentes con el movimiento incremental
+            cards = getattr(block, '_cards', None)
+            card_cols = getattr(block, '_card_cols', None)
+            if cards is not None:
+                cards.setdefault(task_id, widget)
             new_column = None
             for col in block.findChildren(KanbanColumnWidget):
                 if col.priority_key == new_priority:
@@ -555,6 +717,8 @@ class KanbanWindow(QMainWindow):
             if new_column and old_column != new_column:
                 old_column.task_layout.removeWidget(widget)
                 new_column.add_task(widget)
+            if card_cols is not None:
+                card_cols[task_id] = new_priority
             widget.task_data['text'] = widget.task_ref.text
             widget.task_data['priority'] = new_priority if new_priority != 'NP' else ''
             widget.update_data(widget.task_data)
