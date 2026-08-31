@@ -36,12 +36,43 @@ if [ ! -d "$SOURCE_DIR" ]; then
     exit 1
 fi
 
+# --- Coexistencia con el paquete .deb ---
+# Ambos métodos comparten /opt/qtodotxt-es: no pueden convivir instalados.
+if dpkg-query -W -f='${Status}' "$APP_NAME" 2>/dev/null | grep -q "install ok installed"; then
+    echo "⚠️  Detectado un paquete .deb de '$APP_NAME' gestionado por dpkg."
+    echo "    Los dos métodos comparten $INSTALL_DIR y no pueden convivir instalados."
+    read -r -p ">>> ¿Desinstalar el paquete .deb ahora? [s/N] " RESP
+    if [ "$RESP" = "s" ] || [ "$RESP" = "S" ]; then
+        dpkg -r "$APP_NAME" || { echo "❌ No se pudo desinstalar el .deb. Abortando."; exit 1; }
+    else
+        echo "❌ Abortado. Desinstala antes el .deb con: sudo apt remove $APP_NAME"
+        exit 1
+    fi
+fi
+
+# --- Comprobación de dependencias Qt del sistema (solo aviso, no instala) ---
+QT_DEPS="python3-pyqt5 python3-pyqt5.qtquick qml-module-qtquick-controls qml-module-qtquick-dialogs qml-module-qtquick-layouts qml-module-qtquick-window2 qml-module-qt-labs-settings"
+MISSING=""
+for pkg in $QT_DEPS; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        MISSING="$MISSING $pkg"
+    fi
+done
+if [ -n "$MISSING" ]; then
+    echo "⚠️  Faltan dependencias Qt del sistema:$MISSING"
+    echo "    Instálalas con: sudo apt install$MISSING"
+    echo "    (Continuamos: la aplicación puede no arrancar sin ellas.)"
+fi
+
 # --- Paso 2: Preparar Directorio ---
 echo ">>> 📂 Configurando directorios en $INSTALL_DIR..."
 # Limpiamos instalación previa
 if [ -d "$INSTALL_DIR" ]; then rm -rf "$INSTALL_DIR"; fi
 mkdir -p "$INSTALL_DIR"
 cp -r "$SOURCE_DIR"/* "$INSTALL_DIR/"
+
+# Marcador del método de instalación (lo usa uninstall.sh para informar)
+echo "env" > "$INSTALL_DIR/.install-method"
 
 # --- Paso 3: Crear Entorno Virtual (Híbrido) ---
 echo ">>> 🐍 Creando Entorno Virtual..."

@@ -25,6 +25,20 @@ MAIN_SCRIPT_REL="bin/qtodotxt"
 ICON_FILE="qtodotxt.png"
 DESKTOP_FILE="qtodotxt-es.desktop"
 
+# --- Paso 0: Coexistencia con el paquete .deb ---
+# Ambos métodos comparten /opt/qtodotxt-es: no pueden convivir instalados.
+if dpkg-query -W -f='${Status}' "$APP_NAME" 2>/dev/null | grep -q "install ok installed"; then
+    echo "⚠️  Detectado un paquete .deb de '$APP_NAME' gestionado por dpkg."
+    echo "    Los dos métodos comparten $APP_DIR y no pueden convivir instalados."
+    read -r -p ">>> ¿Desinstalar el paquete .deb ahora? [s/N] " RESP
+    if [ "$RESP" = "s" ] || [ "$RESP" = "S" ]; then
+        dpkg -r "$APP_NAME" || { echo "❌ No se pudo desinstalar el .deb. Abortando."; exit 1; }
+    else
+        echo "❌ Abortado. Desinstala antes el .deb con: sudo apt remove $APP_NAME"
+        exit 1
+    fi
+fi
+
 # --- Paso 1: Instalar Dependencias del Sistema ---
 echo ">>> 📦 Actualizando lista de paquetes e instalando dependencias..."
 apt-get update
@@ -65,6 +79,9 @@ fi
 
 # Copiamos todo el contenido de la carpeta fuente
 cp -r "$SOURCE_DIR"/* "$APP_DIR/"
+
+# Marcador del método de instalación (lo usa uninstall.sh para informar)
+echo "sys" > "$APP_DIR/.install-method"
 
 # --- Paso 3: Crear Lanzador en Terminal ---
 echo ">>> 🐚 Creando lanzador '$APP_NAME'..."
