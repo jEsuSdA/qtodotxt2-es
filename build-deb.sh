@@ -47,18 +47,26 @@ fi
 cp -r "$SOURCE_DIR"/* "$BUILD_DIR/opt/$PKG_NAME/"
 
 # 4. Limpieza de archivos basura antes de empaquetar
-echo ">>> 🧹 Limpiando archivos innecesarios (__pycache__, git, etc)..."
+echo ">>> 🧹 Limpiando archivos innecesarios (__pycache__, git, tests, etc)..."
 find "$BUILD_DIR/opt/$PKG_NAME" -name "__pycache__" -type d -exec rm -rf {} +
 find "$BUILD_DIR/opt/$PKG_NAME" -name "*.pyc" -delete
 find "$BUILD_DIR/opt/$PKG_NAME" -name ".git" -type d -exec rm -rf {} +
-rm -rf "$BUILD_DIR/opt/$PKG_NAME/venv" # Aseguramos no meter un entorno virtual
+rm -rf "$BUILD_DIR/opt/$PKG_NAME/venv" "$BUILD_DIR/opt/$PKG_NAME/env" # Entornos virtuales
+rm -rf "$BUILD_DIR/opt/$PKG_NAME/tests"      # Suite de desarrollo
+rm -rf "$BUILD_DIR/opt/$PKG_NAME/examples"   # Ejemplos de desarrollo
+rm -f "$BUILD_DIR/opt/$PKG_NAME"/shot-*.png  # Capturas de pantalla
+rm -f "$BUILD_DIR/opt/$PKG_NAME/AGENTS.md" "$BUILD_DIR/opt/$PKG_NAME/TRANSLATION.md" # Docs de desarrollo
 rm -f "$BUILD_DIR/opt/$PKG_NAME/uninstall.sh" # No tiene sentido en un .deb
 
 # 5. Crear el lanzador en /usr/bin
-# Este script usa el python del sistema para lanzar el script principal en /opt
+# Misma configuración de temas que el lanzador de install-env.sh
 echo ">>> 🐚 Creando lanzador ejecutable..."
 cat > "$BUILD_DIR/usr/bin/$PKG_NAME" << EOL
 #!/bin/bash
+# Configuración de temas e higiene (igual que el lanzador de install-env.sh)
+export QT_QPA_PLATFORMTHEME=gtk2
+export PYTHONDONTWRITEBYTECODE=1
+
 exec python3 /opt/$PKG_NAME/bin/qtodotxt "\$@"
 EOL
 chmod 755 "$BUILD_DIR/usr/bin/$PKG_NAME"
@@ -79,30 +87,48 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Depends: python3, python3-pyqt5, python3-dateutil, qml-module-qtquick-controls, qml-module-qtquick-dialogs, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qt-labs-settings
+Depends: python3, python3-pyqt5, python3-pyqt5.qtquick, python3-dateutil, qml-module-qtquick-controls, qml-module-qtquick-dialogs, qml-module-qtquick-layouts, qml-module-qtquick-window2, qml-module-qt-labs-settings
 Maintainer: $MAINTAINER
 Description: $DESC
  QTodoTXT-es es una interfaz gráfica moderna para gestionar listas de tareas
  en formato todo.txt. Utiliza Python3 y Qt5 (QML).
 EOL
 
-# 8. Scripts Post-Instalación y Post-Eliminación
-# Para actualizar caché de iconos y escritorio al instalar/desinstalar
+# 8. Scripts de Mantenimiento del Paquete
+# preinst: avisa si existe una instalación previa por script (coexistencia)
+cat > "$BUILD_DIR/DEBIAN/preinst" << EOL
+#!/bin/bash
+if [ "\$1" = "install" ] || [ "\$1" = "upgrade" ]; then
+    if [ -d /opt/$PKG_NAME/env ] || [ -f /usr/local/bin/$PKG_NAME ]; then
+        echo "⚠️  Detectada una instalación previa por script de $PKG_NAME." >&2
+        echo "    El paquete .deb sustituirá /opt/$PKG_NAME." >&2
+        echo "    Ejecuta uninstall.sh si quieres limpiar antes por completo." >&2
+    fi
+fi
+exit 0
+EOL
+chmod 755 "$BUILD_DIR/DEBIAN/preinst"
+
+# postinst: marcador de método + caché de escritorio
 cat > "$BUILD_DIR/DEBIAN/postinst" << EOL
 #!/bin/bash
 set -e
 if [ "\$1" = "configure" ]; then
+    echo "deb" > /opt/$PKG_NAME/.install-method
     update-desktop-database >/dev/null 2>&1 || true
 fi
 exit 0
 EOL
 chmod 755 "$BUILD_DIR/DEBIAN/postinst"
 
+# postrm: limpia restos de instalaciones por script (venv, etc.)
 cat > "$BUILD_DIR/DEBIAN/postrm" << EOL
 #!/bin/bash
 set -e
 if [ "\$1" = "remove" ] || [ "\$1" = "purge" ]; then
     update-desktop-database >/dev/null 2>&1 || true
+    rm -rf /opt/$PKG_NAME/env
+    rmdir --ignore-fail-on-non-empty /opt/$PKG_NAME 2>/dev/null || true
 fi
 exit 0
 EOL
@@ -115,8 +141,10 @@ chmod -R 755 "$BUILD_DIR/opt"
 chmod -R 755 "$BUILD_DIR/usr"
 
 # 10. Construir el paquete
+# --root-owner-group: los ficheros del paquete pertenecen a root:root
+# (sin esto, el .deb conserva el usuario que construye el paquete)
 echo ">>> 📦 Empaquetando..."
-dpkg-deb --build "$BUILD_DIR" "$DEB_NAME"
+dpkg-deb --root-owner-group --build "$BUILD_DIR" "$DEB_NAME"
 
 # 11. Limpieza
 echo ">>> 🗑 Limpieza final..."
