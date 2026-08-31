@@ -10,6 +10,17 @@ from PyQt5.QtCore import Qt, QMimeData, pyqtSignal, QTimer, QEvent
 from PyQt5.QtGui import QDrag, QPixmap, QPainter, QMouseEvent
 
 
+def format_task_html(text):
+    """Convierte el texto de una tarea en HTML con proyectos/contextos/enlaces coloreados."""
+    if text.startswith('x '):
+        text = text[2:]
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    text = re.sub(r'(\s|^)(\+\S+)', r'\1<span style="color: #3498db;">\2</span>', text)
+    text = re.sub(r'(\s|^)(@\S+)', r'\1<span style="color: #9b59b6;">\2</span>', text)
+    text = re.sub(r'(https?://\S+)', r'<a href="\1">\1</a>', text)
+    return text
+
+
 class KanbanTaskWidget(QFrame):
     """
     Final version of the task card widget.
@@ -29,6 +40,10 @@ class KanbanTaskWidget(QFrame):
         self.setAcceptDrops(False)
         self.setMouseTracking(True)
 
+        # Cachés para saltar setText/setStyleSheet cuando no hay cambios
+        self._last_html = None
+        self._last_style_key = None
+
         layout = QGridLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
@@ -38,6 +53,7 @@ class KanbanTaskWidget(QFrame):
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
 
         task_text_html = self._format_task_text(task_data)
+        self._last_html = task_text_html
         self.text_label = QLabel(task_text_html)
         self.text_label.setWordWrap(True)
         self.text_label.setOpenExternalLinks(True)
@@ -51,13 +67,23 @@ class KanbanTaskWidget(QFrame):
         self.text_label.installEventFilter(self)
 
     def update_data(self, task_data):
-        """Actualizar los datos de un widget existente sin destruirlo."""
+        """Actualizar los datos de un widget existente sin destruirlo.
+        Sólo toca Qt cuando algo cambia realmente (caché de HTML y estilo)."""
         self.task_data = task_data
         self.task_id = task_data['task_id']
         self.task_ref = task_data['task_ref']
-        self.checkbox.setChecked(task_data['is_done'])
-        self.text_label.setText(self._format_task_text(task_data))
-        self._apply_priority_style(task_data['priority'], task_data['is_done'])
+
+        if self.checkbox.isChecked() != task_data['is_done']:
+            self.checkbox.setChecked(task_data['is_done'])
+
+        html = self._format_task_text(task_data)
+        if html != self._last_html:
+            self._last_html = html
+            self.text_label.setText(html)
+
+        style_key = (task_data['priority'], task_data['is_done'])
+        if style_key != self._last_style_key:
+            self._apply_priority_style(style_key[0], style_key[1])
 
     def eventFilter(self, source, event):
         if source is self.text_label:
@@ -78,16 +104,10 @@ class KanbanTaskWidget(QFrame):
         return super().eventFilter(source, event)
 
     def _format_task_text(self, task_data):
-        text = task_data['text']
-        if text.startswith('x '):
-            text = text[2:]
-        text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        text = re.sub(r'(\s|^)(\+\S+)', r'\1<span style="color: #3498db;">\2</span>', text)
-        text = re.sub(r'(\s|^)(@\S+)', r'\1<span style="color: #9b59b6;">\2</span>', text)
-        text = re.sub(r'(https?://\S+)', r'<a href="\1">\1</a>', text)
-        return text
+        return format_task_html(task_data['text'])
 
     def _apply_priority_style(self, priority, is_done):
+        self._last_style_key = (priority, is_done)
         base_style = (
             "QFrame {{ background-color: #ffffff; border: 1px solid #e0e0e0; "
             "border-radius: 3px; border-left: 5px solid {color}; }}"
