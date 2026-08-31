@@ -15,6 +15,8 @@ class KanbanController(QtCore.QObject):
         self._main = main_controller
         self._kanban_data = {}
         self._self_modified = False
+        self._dirty = False
+        self._last_signature = None
 
         self._columns = {
             'NP': 'Bandeja de Entrada',
@@ -32,20 +34,20 @@ class KanbanController(QtCore.QObject):
         self._rebuild_timer.timeout.connect(self._rebuild_now)
 
         # Conexiones (evita duplicados si reutilizas la instancia)
-        try:
-            self._main._file.fileModified.disconnect(self._schedule_rebuild)
-        except Exception:
-            pass
-        try:
-            self._main.fileExternallyModified.disconnect(self._schedule_rebuild)
-        except Exception:
-            pass
-
-        self._main._file.fileModified.connect(self._schedule_rebuild)
-        self._main.fileExternallyModified.connect(self._schedule_rebuild)
+        for signal in (
+            self._main._file.fileModified,
+            self._main.fileExternallyModified,
+            self._main.filteredTasksChanged,
+        ):
+            try:
+                signal.disconnect(self._schedule_rebuild)
+            except Exception:
+                pass
+            signal.connect(self._schedule_rebuild)
 
         # Primer build
         self._generate_kanban_data()
+        self._last_signature = self._signature(self._kanban_data)
 
     @QtCore.pyqtProperty('QVariant', notify=kanbanDataChanged)
     def kanbanData(self):
@@ -58,21 +60,56 @@ class KanbanController(QtCore.QObject):
     # -------------------------
     # Debounce rebuild
     # -------------------------
-    def _schedule_rebuild(self, *args, **kwargs):
+    def _schedule_rebuild(self, modified=True, *args, **kwargs):
+        # fileModified(False) = solo guardado, sin cambio de contenido
+        if modified is False:
+            return
         # Skipar rebuild si el cambio proviene del propio Kanban (update incremental)
         if self._self_modified:
             return
-        # No reconstruir el tablero si la ventana no está visible
+        self._request_rebuild()
+
+    def _request_rebuild(self):
+        # No reconstruir el tablero si la ventana no está visible: marcar pendiente
         kanban_window = getattr(self._main, 'kanban_window', None)
         if kanban_window is None or not kanban_window.isVisible():
+            self._dirty = True
             return
         # Iniciar timer solo si no está ya activo (evita reinicios continuos)
         if not self._rebuild_timer.isActive():
             self._rebuild_timer.start()
 
     def _rebuild_now(self):
+        kanban_window = getattr(self._main, 'kanban_window', None)
+        if kanban_window is None or not kanban_window.isVisible():
+            self._dirty = True
+            return
+        self._dirty = False
         self._generate_kanban_data()
-        self.kanbanDataChanged.emit()
+        signature = self._signature(self._kanban_data)
+        if signature != self._last_signature:
+            self._last_signature = signature
+            self.kanbanDataChanged.emit()
+
+    def consume_dirty(self):
+        """Reconstruye el tablero pendiente al volver a mostrar la ventana."""
+        if self._dirty:
+            self._rebuild_now()
+
+    @staticmethod
+    def _signature(kanban_data):
+        """Firma barata de los datos para detectar rebuilds sin cambios reales."""
+        sig = []
+        for project_name, project_data in kanban_data.items():
+            cols = tuple(
+                tuple(
+                    (t['task_id'], t['priority'], t['is_done'], t['text'])
+                    for t in project_data['tasks'][prio]
+                )
+                for prio in ('NP', 'D', 'C', 'B', 'A')
+            )
+            sig.append((project_name, cols))
+        return tuple(sig)
 
     # -------------------------
     # Data generation

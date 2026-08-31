@@ -388,6 +388,14 @@ class KanbanWindow(QMainWindow):
             QTimer.singleShot(0, self._adjust_columns_height_for_filter)
 
     # -------------------------
+    # Al reabrir la ventana: reconstruir si quedó pendiente estando oculta
+    # -------------------------
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.controller is not None:
+            self.controller.consume_dirty()
+
+    # -------------------------
     # Board build
     # -------------------------
     def _refresh_board(self):
