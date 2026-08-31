@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 # Agregar directorio raíz al path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Importar componentes
 from qtodotxt2.kanban_controller import KanbanController
