@@ -6,7 +6,7 @@ QTodoTxt2-es: Spanish fork of QTodoTxt2 — a PyQt5/QML GUI for `todo.txt` files
 
 - Repo **root** holds only packaging/install helpers: `build-deb.sh`, `install-env.sh`, `install-sys.sh`, `uninstall.sh`, `qtodotxt-es.desktop`, `qtodotxt.png`, `requirements.txt`.
 - The **actual application** lives in `qtodotxt-es/` (note: subdir name differs from the importable package name `qtodotxt2`).
-  - `qtodotxt-es/qtodotxt2/` — Python package (`app.py`, `main_controller.py`, `kanban_controller.py`, `kanban_window.py`, `filters_controller.py`, `lib/`, `qml/`).
+  - `qtodotxt-es/qtodotxt2/` — Python package (`app.py`, `main_controller.py`, `kanban_controller.py`, `kanban_window.py`, `dashboard_window.py`, `filters_controller.py`, `lib/`, `qml/`).
   - `qtodotxt-es/bin/qtodotxt` — Linux launcher (adds parent dir to `sys.path`, calls `qtodotxt2.app.run()`). `qtodotxt.pyw` is the Windows launcher.
   - `qtodotxt-es/tests/`, `qtodotxt-es/i18n/`, `qtodotxt-es/setup.py`, `qtodotxt-es/pylupdate.py`, `qtodotxt-es/compile_rc.py`.
 
@@ -50,8 +50,24 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest tests.test_tasks.TestTasks.test_pr
   - `tests/test_kanban.py` — contains a hardcoded developer path (`/home/jesusda/work-in-progress/...`) and won't run elsewhere. Consider deleting or fixing if you touch it.
   - `tests/demo_kanban.py` — creates a temp `todo.txt` and opens a real Kanban window.
   - `tests/check_kanban_scenarios.py` — exercises special paths (external reload with new ids, dirty-flag on hidden window, repeated reopen, drag+reload mix, forced full-rebuild fallback). Prints `OK`/`FALLO` per scenario; exits non-zero on failure.
+  - `tests/check_dashboard.py` — dashboard parity smoke test (see Dashboard section). Prints `OK`/`FALLO`; sandbox data only.
   - `tests/bench_kanban.py [n_tareas] [n_proyectos]` — Kanban benchmark (default 500/40). Use it **before and after** any perf-related change to the board.
 - Fixtures: `tests/todo_valid.txt`, `tests/todo_test_output.txt`.
+
+## Dashboard window (read-only parity panel)
+
+`qtodotxt2/dashboard_window.py` is a second window with the same 17 blocks and formulas as the CLI dashboard (`/home/jesusda/Público/owncloud/todotxt/plugins/dashboard`) and the web dashboard — single spec: `todotxt/docs/dashboard-paridad.md`. Opened from the toolbar (`MainToolBar.qml` dashboardButton → `MainController.openDashboardView()`; icon registered in `qml/Theme/res.qrc`, recompile with `compile_rc.py` after qrc edits).
+
+- **`openDashboardView` MUST keep its `@QtCore.pyqtSlot()`** — QML can only invoke slots; a plain Python method raises `TypeError: ... is not a function` when clicked (this was the original bug; `openKanbanView` set the pattern).
+- **Strictly read-only**: data comes from `main_controller._file.tasks` plus a pure read of `done.txt` next to the todo file and the `.ice_recur_completed` sentinel. Auto-refresh every 30 s while visible (`showEvent`/`hideEvent`).
+- **Intentional parity quirks** (replicate the CLI exactly, they are load-bearing for number equality):
+  - inbox counts pending lines without a leading `([A-Z])` whose text does NOT contain the substring `"x 20"` (CLI grep quirk, e.g. "burofax 2024");
+  - creation date is only the first 10 chars of the line — `"(X) 2024-..."` counts as sin-creación (antigüedad, creadas, estancado);
+  - balance uses the documented formula for done.txt creations, which differs from the CLI by 1 in rare cases (the CLI awk has a `substr` off-by-one there);
+  - block 13 (cuellos de botella) uses the **web/PHP semantics**; the CLI's awk is dead code that always prints "Sin cuellos de botella";
+  - ties in foco/contextos/urgencias replicate the CLI `sort -rn` fallback: name DESC (sort twice: name desc, then stable by count).
+- **No emojis**: Qt/DejaVu renders them as tofu. All display glyphs go through the module-level `SIMBOLOS` dict + `_nice()` (applied in `_card`/`_linea`), using plain BMP symbols from `/home/jesusda/base/templates/simbolos-en-texto-plano.txt`. If you add UI text, use only those glyphs or extend the dict.
+- Test it with the standalone sandbox script: `QT_QPA_PLATFORM=offscreen python3 tests/check_dashboard.py` (asserts ~45 parity formulas; creates its own temp todo/done, never touches user data).
 
 ## Kanban architecture (read before touching kanban_*.py)
 

@@ -30,6 +30,7 @@ La razón para hacerlo es porque es una aplicación que uso a diario desde hace 
 - **Mejora de rendimento** y resolución de problemas de bloqueos en hilos.
 - **Actualización del código** para evitar problemas con versiones modernas de python3.
 - **Panel Kanban** para gestión de progreso de proyectos (ver sección siguiente).
+- **Panel Dashboard** con 17 bloques de información estratégica sobre tus tareas (ver sección siguiente).
 
 
 ### PANEL KANBAN
@@ -54,13 +55,34 @@ La ventaja de este tipo de planificación es que nos permite hacer revisiones pe
 Además, el trablero Kanban se abre en una ventana adicional, lo que nos permite seguir trabajando con la lista de tareas en formato habitual.
 
 Las tareas en el tablero Kanban se pueden **marcar como hechas** o **arrastrar de una columna a otra (drag and drop)** para cambiar su prioridad y así facilitar la planificación.
-
 Además, el tablero Kanban, inicialmente muestra todas las tareas agrupadas por proyectos, lo que *es genial para evaluar el progreso de cada uno de ellos*, y también permite **filtrar** por nombre de proyecto, para enfocarnos mejor en cada uno de ellos.
 
 
+### PANEL DASHBOARD
 
+En la misma línea que el panel Kanban he añadido un **panel DASHBOARD** (el botón de la barra de herramientas, junto al de Kanban) que se abre en una ventana adicional y muestra una **visión estratégica de todo el sistema de tareas** en 17 bloques:
 
+1. **Salud del flujo (Kanban)** — conteos por prioridad (A/B/C/D + inbox) con límites y avisos de sobrecarga.
+2. **Recurrentes (cron)** — salud del cron que genera las tareas recurrentes.
+3. **Resumen ejecutivo** — pendientes, completadas, ratio, velocidad, balance neto.
+4. **Radar de urgencias** — tareas vencidas y próximas a vencer (7 días), agrupadas por proyecto.
+5. **Foco actual** — top 5 proyectos activos en (A)/(B), proyectos dormidos, dispersión y recomendación de concentración.
+6. **Progreso 7 días** — completadas por día, creadas hoy y tendencia semanal.
+7. **@waiting delegadas** — tareas esperando a terceros, envejecimiento (+7d/+30d).
+8. **Alertas de riesgo** — sobrecarga de (A), tareas sin fecha, inbox alto, proyectos estancados, caídas de productividad...
+9. **Antigüedad** — tareas con edad 30/60/90 días y más antiguas.
+10. **Contextos activos** — top 5 contextos con pendientes y vencidas.
+11. **Balance entrada/salida** — histórico de 4 semanas y estimación de vaciado del backlog.
+12. **Quick wins** — proyectos que se pueden cerrar rápido (>75% completado y ≤3 pendientes).
+13. **Cuellos de botella** — proyectos bloqueados por tareas @waiting.
+14. **Estado del sistema** — @waiting, @incubadora, zombies (D) antiguos, huérfanas.
+15. **Salud del sistema** — puntuación global /100 con las penalizaciones listadas.
+16. **Logros** — tareas de hoy, racha consecutiva y próximos hitos.
+17. **Consejo ZTD** — consejo según el estado del sistema, de crisis a flujo zen, más un tip rotatorio.
 
+El panel es de **solo lectura** (jamás escribe en tus ficheros) y los datos se refrescan automáticamente cada 30 segundos mientras la ventana está visible. La cabecera de cada bloque y sus fórmulas son idénticas a las de la versión de línea de comandos (`todo.sh dashboard`) y a las de mi versión web, de modo que los tres muestran siempre los mismos números.
+
+![QTODOTXT2-es Dashboard](shot-qtodotxt2-es-dashboard.png)
 
 
 A su vez, QtodoTXT2 es un fork de QtodoTXT, que es el original.
