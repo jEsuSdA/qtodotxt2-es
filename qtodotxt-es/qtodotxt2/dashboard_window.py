@@ -28,6 +28,27 @@ COL_MUTED = '#95a5a6'
 LIMIT_A = 5
 LIMIT_B = 20
 
+# Los emojis salen como rectángulos vacíos en Qt (DejaVu no tiene los glifos
+# fuera del BMP y los VS16). Se sustituyen por símbolos en texto plano del
+# template del usuario: /home/jesusda/base/templates/simbolos-en-texto-plano.txt
+SIMBOLOS = {
+    '📊': '☰', '♻': '↻', '⏰': '⚑', '🎯': '◎', '📈': '▲', '📉': '▼',
+    '⏳': '⌛', '⏱': '⌛', '🔄': '↻', '⌚': '⌛', '🚀': '➤', '🔒': '▣',
+    '🧹': '☰', '🩺': '❤', '🏆': '★', '🧘': '☾', '🧟': '☠', '🗑': '☒',
+    '🧊': '◇', '🚨': '⚠', '✨': '✦', '💡': '☀', '🎉': '❀', '🔥': '♨',
+    '🏁': '⚑', '📌': '►', '📥': '', '💪': '', '📋': '☰', '🏷': '✂',
+    '🐢': '⚠', '🛑': '⚠', '🔍': '◉', '❓': '?',
+}
+
+
+def _nice(t):
+    """Sustituye emojis tofu por símbolos BMP y quita los selectores VS16."""
+    t = t.replace('\ufe0f', '')
+    for k, v in SIMBOLOS.items():
+        if k in t:
+            t = t.replace(k, v)
+    return t
+
 
 def today_str():
     return datetime.date.today().isoformat()
@@ -578,7 +599,7 @@ class DashboardWindow(QMainWindow):
         lay = QVBoxLayout(card)
         lay.setContentsMargins(14, 10, 14, 12)
         lay.setSpacing(6)
-        h = QLabel(titulo)
+        h = QLabel(_nice(titulo))
         h.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50; border: none;")
         lay.addWidget(h)
         # insertar antes del stretch final
@@ -586,7 +607,7 @@ class DashboardWindow(QMainWindow):
         return card, lay
 
     def _linea(self, lay, html, size=90):
-        lbl = QLabel(html)
+        lbl = QLabel(_nice(html))
         lbl.setWordWrap(True)
         lbl.setStyleSheet("font-size: %d%%; border: none; color: #2d2a26;" % size)
         lay.addWidget(lbl)
