@@ -359,6 +359,7 @@ class MainController(QtCore.QObject):
         self.kanban_window.show()
 
 
+    @QtCore.pyqtSlot()
     def openDashboardView(self):
         """Ventana dashboard (paridad con los dashboards CLI/web: fórmulas de
         docs/dashboard-paridad.md). Solo lectura sobre las tareas cargadas."""
