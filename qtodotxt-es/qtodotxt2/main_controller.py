@@ -359,6 +359,22 @@ class MainController(QtCore.QObject):
         self.kanban_window.show()
 
 
+    def openDashboardView(self):
+        """Ventana dashboard (paridad con los dashboards CLI/web: fórmulas de
+        docs/dashboard-paridad.md). Solo lectura sobre las tareas cargadas."""
+        from qtodotxt2.dashboard_window import DashboardWindow
+
+        if not hasattr(self, "dashboard_window") or self.dashboard_window is None:
+            self.dashboard_window = DashboardWindow(self)
+        else:
+            # si ya existe, refrescamos y la traemos al frente
+            self.dashboard_window.refresh()
+            self.dashboard_window.raise_()
+            self.dashboard_window.activateWindow()
+
+        self.dashboard_window.show()
+
+
     
     # Añadir helper para actualizar prioridad
     def updateTaskPriority(self, line_index, new_priority):

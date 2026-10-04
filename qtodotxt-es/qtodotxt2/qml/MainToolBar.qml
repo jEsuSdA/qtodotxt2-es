@@ -65,6 +65,12 @@ ToolBar {
             onClicked: mainController.openKanbanView()
         }
 
+        ToolButton {
+            id: dashboardButton
+            iconSource: "qrc:///white_icons/resources/white/dashboard.svg"
+            onClicked: mainController.openDashboardView()
+        }
+
         Item { Layout.fillWidth: true }
     }
 }

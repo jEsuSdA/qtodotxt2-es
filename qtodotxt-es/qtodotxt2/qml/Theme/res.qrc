@@ -38,5 +38,6 @@
         <file>resources/white/TaskPriorityDecrease.svg</file>
         <file>resources/white/TaskPriorityIncrease.svg</file>
         <file>resources/white/Kanban.svg</file>
+        <file>resources/white/dashboard.svg</file>
     </qresource>
 </RCC>
